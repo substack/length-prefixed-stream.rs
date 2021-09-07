@@ -10,15 +10,15 @@ use std::collections::VecDeque;
 type Error = Box<dyn std::error::Error+Send+Sync+'static>;
 
 pub fn decode(
-  input: impl AsyncRead+Unpin+'static
-) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Unpin> {
+  input: impl AsyncRead+Send+Sync+Unpin+'static
+) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Send+Sync+Unpin> {
   decode_with_options(input, DecodeOptions::default())
 }
 
 pub fn decode_with_options(
-  input: impl AsyncRead+Unpin+'static,
+  input: impl AsyncRead+Send+Sync+Unpin+'static,
   options: DecodeOptions,
-) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Unpin> {
+) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Send+Sync+Unpin> {
   let state = Decoder::new(input, options);
   Box::new(unfold(state, async move |mut state| {
     match state.next().await {
