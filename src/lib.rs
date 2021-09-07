@@ -1,5 +1,7 @@
 #![feature(async_closure,backtrace)]
 #![allow(unused_assignments)]
+#![doc=include_str!("../readme.md")]
+
 use async_std::{prelude::*,stream::Stream};
 use futures::io::AsyncRead;
 use std::marker::Unpin;
@@ -9,8 +11,8 @@ use std::collections::VecDeque;
 mod unfold;
 use unfold::unfold;
 mod error;
-pub use error::{Error,DecodeError,DecodeErrorKind};
-use error::DecodeErrorKind as EK;
+pub use error::{DecodeError,DecodeErrorKind};
+use error::{DecodeErrorKind as EK};
 
 pub fn decode(
   input: impl AsyncRead+Send+Sync+Unpin+'static
