@@ -1,24 +1,27 @@
-#![feature(async_closure)]
+#![feature(async_closure,backtrace)]
 #![allow(unused_assignments)]
 use async_std::{prelude::*,stream::Stream};
 use futures::io::AsyncRead;
-mod unfold;
-use unfold::unfold;
 use std::marker::Unpin;
 use desert::varint;
 use std::collections::VecDeque;
-type Error = Box<dyn std::error::Error+Send+Sync+'static>;
+
+mod unfold;
+use unfold::unfold;
+mod error;
+pub use error::{Error,DecodeError,DecodeErrorKind};
+use error::DecodeErrorKind as EK;
 
 pub fn decode(
   input: impl AsyncRead+Send+Sync+Unpin+'static
-) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Send+Sync+Unpin> {
+) -> Box<dyn Stream<Item=Result<Vec<u8>,DecodeError>>+Send+Sync+Unpin> {
   decode_with_options(input, DecodeOptions::default())
 }
 
 pub fn decode_with_options(
   input: impl AsyncRead+Send+Sync+Unpin+'static,
   options: DecodeOptions,
-) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Send+Sync+Unpin> {
+) -> Box<dyn Stream<Item=Result<Vec<u8>,DecodeError>>+Send+Sync+Unpin> {
   let state = Decoder::new(input, options);
   Box::new(unfold(state, async move |mut state| {
     match state.next().await {
@@ -61,7 +64,7 @@ impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
       options,
     }
   }
-  pub async fn next(&mut self) -> Result<Option<Vec<u8>>,Error> {
+  pub async fn next(&mut self) -> Result<Option<Vec<u8>>,DecodeError> {
     if let Some(buf) = self.queue.pop_front() {
       return Ok(Some(buf));
     }
@@ -72,7 +75,7 @@ impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
       if n == 0 && self.write_offset == 0 {
         return Ok(None);
       } else if n == 0 {
-        panic!["unexpected end of input stream while decoding varint"];
+        return EK::UnexpectedEndVarint {}.raise();
       }
       self.write_offset += n;
       match varint::decode(&self.buffer) {
@@ -93,7 +96,7 @@ impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
       if msg_len + read_offset > self.write_offset {
         let n = self.input.read(&mut self.buffer[self.write_offset..]).await?;
         if n == 0 {
-          panic!["unexpected end of message content"];
+          return EK::UnexpectedEndMessage {}.raise();
         }
         self.write_offset += n;
       } else {
