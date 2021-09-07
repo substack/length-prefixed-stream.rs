@@ -3,6 +3,10 @@ use length_prefixed_stream::decode;
 use futures::{stream::TryStreamExt};
 type Error = Box<dyn std::error::Error+Send+Sync+'static>;
 
+// this program will print:
+// [97,98,99,100,101,102]
+// [65,66,67,68]
+
 fn main() -> Result<(),Error> {
   task::block_on(async {
     let input = stream::from_iter(vec![

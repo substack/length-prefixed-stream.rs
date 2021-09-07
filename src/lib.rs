@@ -9,8 +9,17 @@ use desert::varint;
 use std::collections::VecDeque;
 type Error = Box<dyn std::error::Error+Send+Sync+'static>;
 
-pub fn decode(input: impl AsyncRead+Unpin+'static) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Unpin> {
-  let state = Decoder::new(input, 10_000);
+pub fn decode(
+  input: impl AsyncRead+Unpin+'static
+) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Unpin> {
+  decode_with_options(input, DecodeOptions::default())
+}
+
+pub fn decode_with_options(
+  input: impl AsyncRead+Unpin+'static,
+  options: DecodeOptions,
+) -> Box<dyn Stream<Item=Result<Vec<u8>,Error>>+Unpin> {
+  let state = Decoder::new(input, options);
   Box::new(unfold(state, async move |mut state| {
     match state.next().await {
       Ok(Some(x)) => Some((Ok(x),state)),
@@ -20,20 +29,36 @@ pub fn decode(input: impl AsyncRead+Unpin+'static) -> Box<dyn Stream<Item=Result
   }))
 }
 
+pub struct DecodeOptions {
+  max_size: usize,
+  include_len: bool,
+}
+
+impl Default for DecodeOptions {
+  fn default() -> Self {
+    Self {
+      max_size: 50_000,
+      include_len: false,
+    }
+  }
+}
+
 struct Decoder<AR: AsyncRead> {
   input: AR,
   buffer: Vec<u8>,
   queue: VecDeque<Vec<u8>>,
   write_offset: usize,
+  options: DecodeOptions,
 }
 
 impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
-  pub fn new(input: AR, max_size: usize) -> Self {
+  pub fn new(input: AR, options: DecodeOptions) -> Self {
     Self {
       input,
-      buffer: vec![0u8;max_size],
+      buffer: vec![0u8;options.max_size],
       write_offset: 0,
       queue: VecDeque::new(),
+      options,
     }
   }
   pub async fn next(&mut self) -> Result<Option<Vec<u8>>,Error> {
