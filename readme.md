@@ -2,6 +2,9 @@
 
 decode a byte stream of varint length-encoded messages into a stream of chunks
 
+This crate is similar to and compatible with the
+[javascript length-prefixed-stream](https://www.npmjs.com/package/length-prefixed-stream) package.
+
 # example
 
 ``` rust
