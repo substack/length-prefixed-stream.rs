@@ -30,8 +30,8 @@ pub fn decode_with_options(
 }
 
 pub struct DecodeOptions {
-  max_size: usize,
-  include_len: bool,
+  pub max_size: usize,
+  pub include_len: bool,
 }
 
 impl Default for DecodeOptions {
@@ -100,7 +100,13 @@ impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
         break;
       }
     }
-    let buf = self.buffer[read_offset..read_offset+msg_len].to_vec();
+    let buf = {
+      if self.options.include_len {
+        self.buffer[0..read_offset+msg_len].to_vec()
+      } else {
+        self.buffer[read_offset..read_offset+msg_len].to_vec()
+      }
+    };
     {
       let mut offset = read_offset + msg_len;
       let mut vlen = 0;
@@ -117,13 +123,18 @@ impl<AR> Decoder<AR> where AR: AsyncRead+Unpin+'static {
           break;
         }
         offset += vlen;
-        let qbuf = self.buffer[offset..offset+msg_len].to_vec();
+        let qbuf = {
+          if self.options.include_len {
+            self.buffer[offset-vlen..offset+msg_len].to_vec()
+          } else {
+            self.buffer[offset..offset+msg_len].to_vec()
+          }
+        };
         self.queue.push_back(qbuf);
         offset += msg_len;
       }
       self.buffer.copy_within(offset.., 0);
       self.write_offset -= offset;
-      //self.write_offset = 0;
     }
     Ok(Some(buf))
   }
